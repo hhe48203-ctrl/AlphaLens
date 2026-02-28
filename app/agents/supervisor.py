@@ -70,16 +70,20 @@ def supervisor_node(state: AlphaLensState) -> dict:
 
     else:
         ticker = state["ticker"]
-        # Looped back — Truth Checker found conflicts
         truth = state.get("truth_check_report")
-        conflict_summary = ""
+
         if truth and truth.conflicts:
             conflict_summary = "; ".join([c.explanation for c in truth.conflicts[:2]])
+            reason_label = "conflict-driven"
+            reason_detail = conflict_summary[:120]
+        else:
+            reason_label = "data quality / low confidence"
+            reason_detail = truth.summary[:120] if truth else "insufficient data"
 
-        print(f"🧠 Supervisor: Round {iteration + 1} investigation (conflict-driven)")
-        print(f"   Reason: {conflict_summary[:100]}...")
+        print(f"🧠 Supervisor: Round {iteration + 1} investigation ({reason_label})")
+        print(f"   Reason: {reason_detail}")
         print("   Re-dispatching tasks to 3 Agents...")
-        msg = f"[Supervisor] Round {iteration + 1} re-investigation, conflict: {conflict_summary[:100]}"
+        msg = f"[Supervisor] Round {iteration + 1} re-investigation ({reason_label}): {reason_detail}"
 
         return {
             "messages": [AIMessage(content=msg, name="supervisor")],

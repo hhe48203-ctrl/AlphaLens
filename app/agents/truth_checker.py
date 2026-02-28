@@ -100,10 +100,14 @@ Your task:
         )
 
     conflict_count = len(report.conflicts)
-    if conflict_count > 0:
-        print(f"   ⚠️ Found {conflict_count} conflict(s) (recommendation: {report.recommendation})")
+    rec = report.recommendation
+    if rec == "needs_more_data":
+        reason = f"{conflict_count} conflict(s) detected" if conflict_count > 0 else "data gaps / low agent confidence"
+        print(f"   ⚠️ Triggering round 2 investigation — {reason} (recommendation: {rec})")
+    elif conflict_count > 0:
+        print(f"   ⚠️ Found {conflict_count} conflict(s) (recommendation: {rec})")
     else:
-        print(f"   ✅ No major conflicts (recommendation: {report.recommendation})")
+        print(f"   ✅ Reports are consistent (recommendation: {rec})")
 
     return {
         "truth_check_report": report,
