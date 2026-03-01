@@ -23,6 +23,8 @@ AlphaLens 使用 [LangGraph](https://github.com/langchain-ai/langgraph) 编排 *
 
 > 基于 LangGraph 构建的多智能体系统，调度 6 个专业 AI Agent，支持循环图路由、Pydantic 结构化输出、SEC 财报分析，将金融信号综合为风险报告，通过 LangSmith 追踪全链路。
 
+<img width="1159" height="711" alt="Screenshot 2026-02-28 at 19 31 52" src="https://github.com/user-attachments/assets/9a583917-770c-44bb-bf07-f5bf2f5a82ee" />
+
 ### 核心亮点
 
 - 🔄 **循环图** — Truth Checker 发现冲突时可将 Agent 送回重新调查
@@ -32,6 +34,8 @@ AlphaLens 使用 [LangGraph](https://github.com/langchain-ai/langgraph) 编排 *
 - 🖥️ **Streamlit 界面** — 实时流式日志、风险仪表盘、指标卡片、可下载报告
 - 📊 **LangSmith 追踪** — LangSmith 仪表盘中完整展示执行链路
 - 💰 **零成本** — 所有 API 均有慷慨的免费额度
+
+<img width="1044" height="808" alt="Screenshot 2026-02-28 at 19 34 36" src="https://github.com/user-attachments/assets/2deac904-47d5-407e-8232-db1d7eae256c" />
 
 ---
 
@@ -185,6 +189,8 @@ Streamlit 界面提供：
    - `needs_more_data`（仅第 1 轮）→ 循环回 Supervisor 进行第 2 轮调查
 5. **Report Generator** 综合生成 1–10 风险评级。
 6. Market Quant 在第 2 轮跳过重复计算（分钟级时间内 yfinance 数据不会变化）。
+
+<img width="996" height="627" alt="Screenshot 2026-02-28 at 19 34 51" src="https://github.com/user-attachments/assets/3f2e7848-6ed7-4467-ad93-64bc169b87d3" />
 
 ---
 
