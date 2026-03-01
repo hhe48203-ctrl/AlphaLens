@@ -23,6 +23,8 @@ AlphaLens orchestrates **6 specialized AI agents** via [LangGraph](https://githu
 
 > Built a LangGraph multi-agent system orchestrating 6 specialized AI agents with cyclic graph routing, Pydantic structured outputs, and SEC filing analysis to synthesize financial signals into risk reports, tracked via LangSmith.
 
+<img width="1159" height="711" alt="Screenshot 2026-02-28 at 19 31 52" src="https://github.com/user-attachments/assets/a14d1c45-2bd2-45c2-8f8e-3953cccdd771" />
+
 ### Key Highlights
 
 - 🔄 **Cyclic Graph** — Truth Checker can loop agents back for deeper investigation when conflicts are detected
@@ -32,6 +34,8 @@ AlphaLens orchestrates **6 specialized AI agents** via [LangGraph](https://githu
 - 🖥️ **Streamlit UI** — Real-time streaming logs, risk gauge, metric cards, downloadable reports
 - 📊 **LangSmith Tracing** — Full execution visibility in the LangSmith dashboard
 - 💰 **$0 Total Cost** — All APIs used have generous free tiers
+
+<img width="1044" height="808" alt="Screenshot 2026-02-28 at 19 34 36" src="https://github.com/user-attachments/assets/6156735e-62ff-4ffc-b6e3-b5b50d308b99" />
 
 ---
 
@@ -185,6 +189,8 @@ The Streamlit interface provides:
    - `needs_more_data` (round 1 only) → loop back to Supervisor for round 2
 5. **Report Generator** synthesizes a calibrated 1–10 risk assessment.
 6. Market Quant skips re-computation on round 2 (yfinance data doesn't change in minutes).
+
+<img width="996" height="627" alt="Screenshot 2026-02-28 at 19 34 51" src="https://github.com/user-attachments/assets/e20b35d9-f5e6-4f72-af0d-0fb0cdeca3b6" />
 
 ---
 
