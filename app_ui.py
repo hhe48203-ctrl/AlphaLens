@@ -6,6 +6,7 @@ import streamlit as st
 import os
 import sys
 import io
+import uuid
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -161,6 +162,12 @@ RISK_LABELS = {
     6: "Slightly Elevated", 7: "Elevated", 8: "High", 9: "Very High", 10: "Critical"
 }
 
+REVIEW_LABELS = {
+    "conservative": "Conservative",
+    "balanced": "Balanced",
+    "aggressive": "Aggressive",
+}
+
 
 # ════════════════════════════════════════════
 # Render functions
@@ -209,6 +216,159 @@ def render_agent_messages(messages):
                 st.markdown(msg.content[:600])
 
 
+def build_initial_state(query: str) -> dict:
+    return {
+        "user_query": query,
+        "ticker": "",
+        "messages": [],
+        "sentiment_report": None,
+        "sec_report": None,
+        "market_quant_report": None,
+        "truth_check_report": None,
+        "final_report": None,
+        "risk_bias": "balanced",
+        "report_language": "en",
+        "reporter_guidance": "",
+        "iteration_count": 0,
+        "max_iterations": 2,
+        "status": "in_progress",
+        "errors": [],
+    }
+
+
+def clear_analysis_session():
+    for key in [
+        "result",
+        "logs",
+        "review_pending",
+        "pending_state",
+        "thread_id",
+        "graph",
+        "graph_config",
+    ]:
+        st.session_state.pop(key, None)
+
+
+def run_graph_phase(graph, config: dict, status_text, log_area, initial_state: dict | None = None):
+    """Run the graph until completion or an interrupt point."""
+    log_buffer = LogBuffer()
+    old_stdout = sys.stdout
+    sys.stdout = log_buffer
+    latest_result = initial_state.copy() if initial_state else {}
+
+    try:
+        for event in graph.stream(initial_state, config=config):
+            for _, output in event.items():
+                if isinstance(output, dict):
+                    latest_result.update(output)
+            update_ui_from_logs(log_buffer.get_logs(), log_area, status_text)
+    finally:
+        sys.stdout = old_stdout
+
+    snapshot = graph.get_state(config)
+    if snapshot and getattr(snapshot, "values", None):
+        latest_result = dict(snapshot.values)
+
+    return latest_result, log_buffer.get_logs(), snapshot
+
+
+def render_review_panel():
+    """Render the human review controls before report generation."""
+    pending_state = st.session_state["pending_state"]
+    truth = pending_state.get("truth_check_report")
+    current_bias = pending_state.get("risk_bias", "balanced")
+    current_language = pending_state.get("report_language", "en")
+    current_guidance = pending_state.get("reporter_guidance", "")
+
+    st.markdown("## Human Review")
+    st.caption("Review the truth-check output and adjust final report settings before generating the report.")
+
+    if truth:
+        c1, c2 = st.columns(2)
+        with c1:
+            st.metric("Overall Consistency", f"{truth.overall_consistency}")
+        with c2:
+            st.metric("Recommendation", truth.recommendation)
+        st.markdown(f"**Summary:** {truth.summary}")
+
+        if truth.conflicts:
+            st.markdown(f"### Conflicts: {len(truth.conflicts)}")
+            for i, conflict in enumerate(truth.conflicts, 1):
+                severity_icon = {
+                    "low": "🟢",
+                    "medium": "🟡",
+                    "high": "🟠",
+                    "critical": "🔴",
+                }.get(conflict.severity, "⚪")
+                with st.expander(f"{severity_icon} Conflict #{i} — {conflict.severity.upper()}", expanded=(i == 1)):
+                    st.markdown(f"**{conflict.source_a}:** {conflict.claim_a}")
+                    st.markdown(f"**{conflict.source_b}:** {conflict.claim_b}")
+                    st.info(conflict.explanation)
+        else:
+            st.success("✅ No conflicts detected")
+
+    with st.form("human_review_form"):
+        risk_bias = st.radio(
+            "Risk scoring bias",
+            options=list(REVIEW_LABELS.keys()),
+            format_func=lambda value: REVIEW_LABELS[value],
+            index=list(REVIEW_LABELS.keys()).index(current_bias),
+            horizontal=True,
+            help="Conservative tends to score mixed evidence slightly higher risk, aggressive slightly lower, balanced stays neutral.",
+        )
+        report_language = st.radio(
+            "Report language",
+            options=["en", "zh"],
+            format_func=lambda value: "English" if value == "en" else "中文",
+            index=0 if current_language == "en" else 1,
+            horizontal=True,
+        )
+        reporter_guidance = st.text_area(
+            "Custom guidance for reporter (optional)",
+            value=current_guidance,
+            placeholder="Example: focus more on downside risks from SEC disclosures; keep the summary concise.",
+            height=120,
+        )
+
+        generate_report = st.form_submit_button("🚀 Generate Final Report", use_container_width=True)
+
+    if generate_report:
+        graph = st.session_state["graph"]
+        config = st.session_state["graph_config"]
+        graph.update_state(
+            config,
+            {
+                "risk_bias": risk_bias,
+                "report_language": report_language,
+                "reporter_guidance": reporter_guidance.strip(),
+            },
+            as_node="truth_checker",
+        )
+
+        with st.status("📋 Finalizing report with human-reviewed settings...", expanded=True) as status:
+            status_text = st.empty()
+            status_text.write("**📋 Generating final report...**")
+            log_area = st.empty()
+
+            result, resume_logs, _ = run_graph_phase(graph, config, status_text, log_area)
+            full_logs = st.session_state.get("logs", "") + resume_logs
+
+            if not result.get("final_report"):
+                status.update(label="❌ Final report generation failed", state="error")
+                status_text.write("**❌ Final report generation failed**")
+                update_ui_from_logs(full_logs, log_area, status_text)
+                return
+
+            status.update(label=f"✅ {result['ticker']} analysis complete", state="complete")
+            status_text.write(f"**✅ {result['ticker']} analysis complete**")
+
+        st.session_state["result"] = result
+        st.session_state["logs"] = full_logs
+        st.session_state["review_pending"] = False
+        st.session_state.pop("pending_state", None)
+        st.rerun()
+
+
 # ════════════════════════════════════════════
 # Main interface
 # ════════════════════════════════════════════
@@ -247,6 +407,10 @@ def main():
 
     # -- Main area --
 
+    if st.session_state.get("review_pending") and not run_clicked:
+        render_review_panel()
+        return
+
     # Show cached results if available
     if "result" in st.session_state and not run_clicked:
         _render_results(st.session_state["result"], st.session_state["logs"])
@@ -273,47 +437,36 @@ def main():
         st.info("👈 Enter a stock ticker, company name, or description in the sidebar and click **Start Analysis**")
         return
 
+    clear_analysis_session()
+
     # -- Run analysis (streaming output) --
     with st.status("🧠 AlphaLens multi-agent analysis in progress...", expanded=True) as status:
         status_text = st.empty()
         status_text.write("**🔍 Resolving target stock...**")
         log_area = st.empty()
 
-        graph = build_graph()
-        initial_state = {
-            "user_query": query,
-            "ticker": "",
-            "messages": [],
-            "sentiment_report": None,
-            "sec_report": None,
-            "market_quant_report": None,
-            "truth_check_report": None,
-            "final_report": None,
-            "iteration_count": 0,
-            "max_iterations": 2,
-            "status": "in_progress",
-            "errors": [],
-        }
+        graph = build_graph(enable_human_review=True)
+        initial_state = build_initial_state(query)
+        thread_id = str(uuid.uuid4())
+        config = {"configurable": {"thread_id": thread_id}}
 
-        # Thread-safe LogBuffer captures print output (no Streamlit calls)
-        log_buffer = LogBuffer()
-        old_stdout = sys.stdout
-        sys.stdout = log_buffer
-
-        # Use graph.stream() for per-node execution, update UI from main thread
-        result = initial_state.copy()
-        try:
-            for event in graph.stream(initial_state):
-                for node_name, output in event.items():
-                    if isinstance(output, dict):
-                        result.update(output)
-                update_ui_from_logs(log_buffer.get_logs(), log_area, status_text)
-        finally:
-            sys.stdout = old_stdout
-
-        logs = log_buffer.get_logs()
+        result, logs, snapshot = run_graph_phase(graph, config, status_text, log_area, initial_state)
 
         if not result.get("final_report"):
+            if snapshot and getattr(snapshot, "next", None):
+                status.update(label="⏸️ Waiting for human review", state="running")
+                status_text.write("**⏸️ Review settings below before generating the final report**")
+                update_ui_from_logs(logs, log_area, status_text)
+
+                st.session_state["review_pending"] = True
+                st.session_state["pending_state"] = result
+                st.session_state["logs"] = logs
+                st.session_state["thread_id"] = thread_id
+                st.session_state["graph"] = graph
+                st.session_state["graph_config"] = config
+                render_review_panel()
+                return
+
             if result.get("status") == "error":
                 status.update(label="❌ Analysis failed: insufficient agent data", state="error")
                 errors = result.get("errors", [])

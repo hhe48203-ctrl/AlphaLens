@@ -9,20 +9,38 @@ def report_generator_node(state: AlphaLensState) -> dict:
 
     ticker = state["ticker"]
     truth = state.get("truth_check_report")
+    risk_bias = state.get("risk_bias", "balanced")
+    report_language = state.get("report_language", "en")
+    reporter_guidance = state.get("reporter_guidance", "").strip()
 
     # Collect all Agent messages
     all_messages = "\n".join([m.content for m in state.get("messages", []) if hasattr(m, "content")])
 
+    language_instruction = "Respond in Chinese only." if report_language == "zh" else "Respond in English only."
+    bias_instruction = {
+        "conservative": "Risk Scoring Bias: Conservative. When evidence is mixed or uncertainty is elevated, lean 1 point higher within the justified range, but do not exaggerate weak signals.",
+        "balanced": "Risk Scoring Bias: Balanced. Calibrate risk scores strictly to the evidence with no systematic upward or downward tilt.",
+        "aggressive": "Risk Scoring Bias: Aggressive. When evidence is mixed and fundamentals are not clearly impaired, lean 1 point lower within the justified range, but do not ignore concrete risks.",
+    }[risk_bias]
+    guidance_instruction = reporter_guidance if reporter_guidance else "None."
+
     llm = get_llm()
     structured_llm = llm.with_structured_output(FinalReport)
 
-    prompt = f"""You are a senior financial analyst writing a balanced investment risk report for {ticker}. Respond in English only.
+    prompt = f"""You are a senior financial analyst writing a balanced investment risk report for {ticker}. {language_instruction}
 
 === Agent Analysis Records ===
 {all_messages}
 
 === Cross-Validation Conclusion ===
 {f"Consistency Score: {truth.overall_consistency}, Conflicts: {len(truth.conflicts)}, Summary: {truth.summary}" if truth else "No validation data"}
+
+=== Human Review Controls ===
+- Selected risk bias: {risk_bias}
+- Selected report language: {"Chinese" if report_language == "zh" else "English"}
+- Custom reporter guidance: {guidance_instruction}
+
+{bias_instruction}
 
 RISK LEVEL SCALE (1-10 integer, follow strictly):
 - 1-2 (Very Low): Strong fundamentals, positive sentiment, stable technicals, no red flags. Think: top-tier blue-chips in a bull market (e.g., AAPL with strong earnings beat).
@@ -49,7 +67,7 @@ Fill in the following fields:
 - technical_section: technical summary — note both support levels and resistance (2-3 sentences)
 - conflicts_section: conflicts summary — if unresolved, explain that uncertainty is normal
 
-Be professional, balanced, and concise."""
+Honor the human review controls above while staying grounded in the evidence. Be professional, balanced, and concise."""
 
     try:
         report = structured_llm.invoke(prompt)

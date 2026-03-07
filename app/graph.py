@@ -1,3 +1,4 @@
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import StateGraph, END, START
 
 from app.state import AlphaLensState
@@ -72,7 +73,7 @@ def route_after_truth_check(state: AlphaLensState) -> str:
     return "report_generator"
 
 
-def build_graph():
+def build_graph(enable_human_review: bool = False):
     builder = StateGraph(AlphaLensState)
 
     # Register all nodes
@@ -115,4 +116,9 @@ def build_graph():
 
     builder.add_edge("report_generator", END)
 
-    return builder.compile()
+    compile_kwargs = {}
+    if enable_human_review:
+        compile_kwargs["checkpointer"] = MemorySaver()
+        compile_kwargs["interrupt_before"] = ["report_generator"]
+
+    return builder.compile(**compile_kwargs)

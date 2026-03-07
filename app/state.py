@@ -86,6 +86,11 @@ class AlphaLensState(TypedDict):
     truth_check_report: TruthCheckReport | None
     final_report: FinalReport | None
 
+    # Human-in-the-loop report controls
+    risk_bias: Literal["conservative", "balanced", "aggressive"]
+    report_language: Literal["en", "zh"]
+    reporter_guidance: str
+
     # Flow control fields
     iteration_count: int    # Current iteration count
     max_iterations: int     # Max allowed iterations (prevents infinite loops)
