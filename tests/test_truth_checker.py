@@ -16,7 +16,11 @@ from app.state import (
     MarketQuantReport,
     SECReport,
 )
-from app.graph import route_after_truth_check
+from app.graph import (
+    data_quality_gate_node,
+    route_after_data_quality_gate,
+    route_after_truth_check,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -142,3 +146,67 @@ def test_truth_checker_node_handles_no_reports():
     assert report.recommendation == "needs_more_data"
     assert report.overall_consistency == 0.0
     assert result["iteration_count"] == 1  # Should increment
+
+
+# ---------------------------------------------------------------------------
+# Test 2g: data_quality_gate should hard-fail when 0/3 reports are available
+# ---------------------------------------------------------------------------
+
+def test_data_quality_gate_fails_when_all_reports_missing():
+    state = {
+        "sentiment_report": None,
+        "sec_report": None,
+        "market_quant_report": None,
+        "errors": ["Sentiment Scout failed", "SEC Auditor failed"],
+    }
+
+    result = data_quality_gate_node(state)
+
+    assert result["status"] == "error"
+    assert "errors" in result
+    assert "All data agents failed" in result["errors"][0]
+
+
+# ---------------------------------------------------------------------------
+# Test 2h: data_quality_gate allows partial data and appends warning
+# ---------------------------------------------------------------------------
+
+def test_data_quality_gate_allows_partial_reports():
+    sentiment = SentimentReport(
+        ticker="AAPL",
+        sentiment_score=0.2,
+        volume_change_pct=12.0,
+        key_narratives=["Earnings optimism"],
+        raw_evidence=["Example source"],
+        confidence=0.8,
+    )
+    state = {
+        "sentiment_report": sentiment,
+        "sec_report": None,
+        "market_quant_report": None,
+        "errors": [],
+    }
+
+    result = data_quality_gate_node(state)
+
+    assert "status" not in result
+    assert "errors" in result
+    assert "Proceeding with incomplete evidence" in result["errors"][0]
+
+
+# ---------------------------------------------------------------------------
+# Test 2i: route_after_data_quality_gate routes to END on status=error
+# ---------------------------------------------------------------------------
+
+def test_route_after_data_quality_gate_end_on_error():
+    state = {"status": "error"}
+    assert route_after_data_quality_gate(state) == "__end__"
+
+
+# ---------------------------------------------------------------------------
+# Test 2j: route_after_data_quality_gate routes to truth_checker otherwise
+# ---------------------------------------------------------------------------
+
+def test_route_after_data_quality_gate_to_truth_checker():
+    state = {"status": "in_progress"}
+    assert route_after_data_quality_gate(state) == "truth_checker"

@@ -1,3 +1,4 @@
+import operator
 from typing import Annotated, Literal
 from typing_extensions import TypedDict
 from pydantic import BaseModel, Field
@@ -89,4 +90,4 @@ class AlphaLensState(TypedDict):
     iteration_count: int    # Current iteration count
     max_iterations: int     # Max allowed iterations (prevents infinite loops)
     status: Literal["in_progress", "completed", "error"]
-    errors: list[str]
+    errors: Annotated[list[str], operator.add]

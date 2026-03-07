@@ -47,11 +47,16 @@ def main():
     # Invoke graph synchronously; LangGraph handles parallelism and loops
     result = graph.invoke(initial_state)
 
-    # If Supervisor could not resolve a ticker, the graph exits early
+    # Graph may exit early due to unresolved ticker or upstream data failures
     if not result.get("final_report"):
         print()
         print("=" * 60)
-        print("  Analysis not performed (could not identify target stock)")
+        if result.get("status") == "error":
+            print("  Analysis failed (insufficient data from agents)")
+            for err in result.get("errors", []):
+                print(f"  - {err}")
+        else:
+            print("  Analysis not performed (could not identify target stock)")
         print("=" * 60)
         return
 

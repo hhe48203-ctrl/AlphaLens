@@ -97,7 +97,9 @@ class LogBuffer:
 def update_ui_from_logs(logs: str, log_area, status_text):
     """Update Streamlit UI from main thread based on log content (safe to call)"""
     # Update status text (match the latest state)
-    if "Report Generator" in logs:
+    if "Data Quality Gate" in logs and "All data agents failed" in logs:
+        status_text.write("**❌ Analysis failed: all data agents failed**")
+    elif "Report Generator" in logs:
         status_text.write("**📋 Generating final report...**")
     elif "Round 2" in logs or "round 2" in logs:
         status_text.write("**⚠️ Conflicts detected, launching round 2 investigation...**")
@@ -312,8 +314,16 @@ def main():
         logs = log_buffer.get_logs()
 
         if not result.get("final_report"):
-            status.update(label="❌ Could not identify target stock", state="error")
-            status_text.write("**❌ Could not identify target stock, please try again**")
+            if result.get("status") == "error":
+                status.update(label="❌ Analysis failed: insufficient agent data", state="error")
+                errors = result.get("errors", [])
+                if errors:
+                    status_text.write(f"**❌ Analysis failed: {errors[-1]}**")
+                else:
+                    status_text.write("**❌ Analysis failed due to upstream data errors**")
+            else:
+                status.update(label="❌ Could not identify target stock", state="error")
+                status_text.write("**❌ Could not identify target stock, please try again**")
             update_ui_from_logs(logs, log_area, status_text)
             return
 

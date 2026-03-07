@@ -14,6 +14,7 @@ def truth_checker_node(state: AlphaLensState) -> dict:
     sentiment = state.get("sentiment_report")
     sec = state.get("sec_report")
     quant = state.get("market_quant_report")
+    errors = state.get("errors", [])
 
     # Compile three reports into text for LLM analysis
     reports_text = ""
@@ -47,6 +48,22 @@ Red Flags: {', '.join(sec.red_flags)}
 Confidence: {sec.confidence}
 """
 
+    missing_dimensions = []
+    if not sentiment:
+        missing_dimensions.append("Sentiment Scout")
+    if not sec:
+        missing_dimensions.append("SEC Auditor")
+    if not quant:
+        missing_dimensions.append("Market Quant")
+
+    data_quality_context = ""
+    if missing_dimensions or errors:
+        data_quality_context = f"""
+⚠️ Data Completeness Context:
+- Missing reports: {", ".join(missing_dimensions) if missing_dimensions else "None"}
+- Upstream errors: {"; ".join(errors) if errors else "None"}
+"""
+
     if not reports_text.strip():
         print("   ⚠️ No reports received")
         report = TruthCheckReport(
@@ -63,6 +80,8 @@ Confidence: {sec.confidence}
     prompt = f"""You are a balanced financial intelligence cross-validation expert. Below are reports from three independent Agents analyzing the same stock. Respond in English only.
 
 {reports_text}
+
+{data_quality_context}
 
 This is validation round {iteration + 1} (max 2 rounds).
 
@@ -85,6 +104,11 @@ Your task:
    - "minor_conflicts": some tone differences but no factual contradictions
    - "needs_more_data": use this in round 1 if ANY of the following are true: (a) agents disagree on the overall direction (one bullish, one bearish), (b) there is a medium or high severity conflict, (c) one agent's confidence is below 0.7, or (d) the data seems incomplete or contradictory enough to benefit from a second look. Prefer this over "consistent" in round 1 — a second round improves report quality.
    - "major_conflicts": genuine factual contradictions exist (round 2 only)
+6. If data is incomplete (missing reports or upstream errors):
+   - Do NOT use "consistent"
+   - Cap overall_consistency at <= 0.6 when exactly one report is missing
+   - Cap overall_consistency at <= 0.3 when two reports are missing
+   - In summary, explicitly mention which analysis dimensions are missing
 
 {"Round 2 Special Rule: Do NOT recommend needs_more_data. If conflicts remain unresolved, accept the uncertainty gracefully. Use 'minor_conflicts' or 'consistent' and note in summary that some information sources show irreconcilable differences, reflecting normal market uncertainty. Do NOT escalate risk just because of unresolved disagreements." if iteration >= 1 else "Round 1 Guidance: Lean toward 'needs_more_data' when in doubt — a second investigation round produces more reliable conclusions. Only use 'consistent' if all three agents clearly agree."}"""
 
