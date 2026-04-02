@@ -148,6 +148,14 @@ AlphaLens/
 │       ├── sec_auditor.py    # SEC EDGAR 财报分析
 │       ├── truth_checker.py  # 交叉验证 + 冲突检测
 │       └── reporter.py       # 最终报告生成（LLM）
+│
+├── tests/
+│   ├── test_*.py             # 单元测试（路由、错误处理、Pydantic 校验）
+│   └── eval/                 # 三层评估框架
+│       ├── eval_schemas.py   # LLM 评审 Pydantic Schema
+│       ├── test_agent_quality.py      # 第一层：LLM-as-Judge 逐 Agent 评估
+│       ├── test_truth_checker_eval.py # 第二层：冲突检测准确度
+│       └── test_e2e_regression.py     # 第三层：全流程回归测试
 ```
 
 ---
@@ -162,6 +170,26 @@ Streamlit 界面提供：
 - **指标卡片** — 三列布局展示 Market / Sentiment / SEC 数据
 - **详情标签页** — 完整报告、Agent 推理链路、冲突分析
 - **下载按钮** — 导出完整 Markdown 报告
+
+---
+
+## 测试与评估
+
+AlphaLens 包含三层评估框架，衡量 Agent 输出质量，而非仅测试功能正确性。
+
+```bash
+# 运行全部评估测试（需要 API key + 足够的 Gemini 配额）
+pytest tests/eval/ -v -s -m slow
+
+# 仅运行单元测试（无 API 调用）
+pytest tests/ --ignore=tests/eval -v
+```
+
+| 层级 | 测试内容 | 方法 |
+|:-----|:---------|:-----|
+| **Agent 质量评估** | 每个 Agent 输出的忠实度、完整度、合理度 | LLM-as-Judge（真实 API 调用 → Gemini 1-5 打分）|
+| **Truth Checker 评估** | 已知场景下的冲突检测准确度 | Mock 报告 + 真实 LLM 交叉验证 |
+| **端到端回归** | 代表性股票（AAPL、TSLA）全流程测试 | Pipeline 完整性 + LLM-as-Judge 评估最终报告 |
 
 ---
 

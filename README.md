@@ -148,6 +148,14 @@ AlphaLens/
 │       ├── sec_auditor.py    # SEC EDGAR filing analysis
 │       ├── truth_checker.py  # Cross-validation + conflict detection
 │       └── reporter.py       # Final report generation (LLM)
+│
+├── tests/
+│   ├── test_*.py             # Unit tests (routing, error handling, Pydantic validation)
+│   └── eval/                 # 3-layer evaluation framework
+│       ├── eval_schemas.py   # LLM judge Pydantic schemas
+│       ├── test_agent_quality.py      # Layer 1: LLM-as-judge per agent
+│       ├── test_truth_checker_eval.py # Layer 2: conflict detection accuracy
+│       └── test_e2e_regression.py     # Layer 3: full pipeline regression
 ```
 
 ---
@@ -162,6 +170,26 @@ The Streamlit interface provides:
 - **Metric Cards** — Three-column layout showing Market / Sentiment / SEC data
 - **Detail Tabs** — Full report, agent reasoning chain, conflict analysis
 - **Download** — Export complete Markdown report
+
+---
+
+## Testing & Evaluation
+
+AlphaLens includes a 3-layer evaluation framework that measures agent output quality, not just functional correctness.
+
+```bash
+# Run all eval tests (requires API keys + sufficient Gemini quota)
+pytest tests/eval/ -v -s -m slow
+
+# Run unit tests only (no API calls)
+pytest tests/ --ignore=tests/eval -v
+```
+
+| Layer | What it tests | Method |
+|:------|:-------------|:-------|
+| **Agent Quality** | Faithfulness, completeness, reasonableness of each agent's output | LLM-as-judge (real API calls → Gemini scores 1-5) |
+| **Truth Checker** | Conflict detection accuracy on known scenarios | Mock reports + real LLM cross-validation |
+| **E2E Regression** | Full pipeline on representative tickers (AAPL, TSLA) | Pipeline completion + LLM-as-judge on final report |
 
 ---
 

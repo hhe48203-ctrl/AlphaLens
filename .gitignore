@@ -27,3 +27,9 @@ Thumbs.db
 
 # Claude Code
 CLAUDE.md
+
+# Build specs (internal dev notes)
+specs/
+
+# Dev log
+log.md
